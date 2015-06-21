@@ -7,7 +7,7 @@ output: html_document
 ## Executive Summary
 This report is a peer assessed assignment for Practical Machine Learning class in Coursera. This exercise will utilize [Human Activity Recognition](http://groupware.les.inf.puc-rio.br/har) dataset and will use Random Forest machine learning algorithm to predict the activity based on sensor data.
 
-Overall, we are fitting a prediction model using random forest algorithm to predict users activity based on sensors data. The model has a prediction accuracy of 99.4% and estimated out of sample error of 0.6% $(1 - testing accuracy)$.
+Overall, we are fitting a prediction model using random forest algorithm to predict users activity based on sensors data. The model has a prediction accuracy of 99.5% and estimated out of sample error of 0.5% $(1 - testing accuracy)$.
 
 ## Setup
 ```{r}
@@ -36,18 +36,6 @@ To prepare the data-set for fitting into ML algorithms, we will perform the foll
 ```{r}
 na_strings <- c("", "NA", "#DIV/0!")
 
-coerce_to_same_column_data_type <- function(train, test) {
-    for (i in 1:length(test) ) {
-        for (j in 1:length(train)) {
-            if ( length( grep(names(train[i]), names(test)[j]) ) == 1)  {
-                class(test[j]) <- class(train[i])
-            }      
-        }      
-    }
-    
-    return(test)
-}
-
 training_set <- read.csv("./data/pml-training.csv", na.strings = na_strings)
 testing_set <- read.csv("./data/pml-test.csv", na.strings = na_strings)
 
@@ -60,7 +48,11 @@ columns_to_remove_na <- which((colSums(is.na(training_set)) >= 0.4 * nrow(traini
 training_set <- training_set[,-columns_to_remove_na]
 testing_set     <- testing_set[,-columns_to_remove_na]
 
-testing_set <- coerce_to_same_column_data_type(training_set, testing_set) # convert all data types to match between training and testing sets
+# convert all columns excluding class / problem id to numeric
+for (i in 1:(length(training_set) - 1)) {
+    training_set[, i] <- as.numeric(training_set[, i])
+    testing_set[, i] <- as.numeric(testing_set[, i])
+}
 
 ```
 
@@ -90,9 +82,9 @@ predictions <- predict(model, testing, type = "raw")
 confusionMatrix(predictions, testing$classe)
 ```
 
-Overall random forest performs really well with accuracy of 99.4%
+Overall random forest performs really well with accuracy of 99.5%
 
-## Submit resuls of test set
+## Submit results of test set
 ```{r}
 write_answer_files = function(x){
   number_of_problems <- length(x)
@@ -107,4 +99,4 @@ write_answer_files(solutions)
 ```
 ## Summary
 
-During this project, we've fitted a prediction model using random forest algorithm to predict users activity based on sensors data. The model has a prediction accuracy of 99.4% and estimated out of sample error of 0.6% $(1 - testing accuracy)$. Although we do estimate the low out of sample error rate, we can expect prediction to be inaccurate much more frequently in the real life. Due to us making a prediction on subject movements being recored when performing to a set of specific predetermined activities.
+During this project, we've fitted a prediction model using random forest algorithm to predict users activity based on sensors data. The model has a prediction accuracy of 99.5% and estimated out of sample error of 0.5% $(1 - testing accuracy)$. Although we do estimate the low out of sample error rate, we can expect prediction to be inaccurate much more frequently in the real life. Due to us making a prediction on subject movements being recored when performing to a set of specific predetermined activities.

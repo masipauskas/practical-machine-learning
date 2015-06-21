@@ -70,16 +70,140 @@ img {
 
 <div id="executive-summary" class="section level2">
 <h2>Executive Summary</h2>
-<p>This report is a peer assessed assignment for Practical Machine Learning class in Coursera. This exercise will utilize <a href="http://groupware.les.inf.puc-rio.br/har">Human Activity Recognition</a> dataset and will use Random Forest machine learning algorithm to predict the activity based on sensor data. ## Setup</p>
+<p>This report is a peer assessed assignment for Practical Machine Learning class in Coursera. This exercise will utilize <a href="http://groupware.les.inf.puc-rio.br/har">Human Activity Recognition</a> dataset and will use Random Forest machine learning algorithm to predict the activity based on sensor data.</p>
+<p>Overall, we are fitting a prediction model using random forest algorithm to predict users activity based on sensors data. The model has a prediction accuracy of 99.5% and estimated out of sample error of 0.5% <span class="math">\((1 - testing accuracy)\)</span>.</p>
+</div>
+<div id="setup" class="section level2">
+<h2>Setup</h2>
+<pre class="r"><code>library(caret)</code></pre>
+<pre><code>## Loading required package: lattice
+## Loading required package: ggplot2</code></pre>
+<pre class="r"><code>require(randomForest)</code></pre>
+<pre><code>## Loading required package: randomForest
+## randomForest 4.6-10
+## Type rfNews() to see new features/changes/bug fixes.</code></pre>
+<pre class="r"><code>set.seed(20150621)</code></pre>
 </div>
 <div id="getting-data" class="section level2">
 <h2>Getting data</h2>
+<pre class="r"><code>if (!dir.exists(&quot;./data&quot;)) {
+    dir.create(&quot;./data&quot;)
+    download.file('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv', './data/pml-training.csv')
+    download.file('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv','./data/pml-test.csv' )
+}</code></pre>
+<p>We’ll create a <code>data</code> directory if it doesn’t exist and download report files to it.</p>
 </div>
 <div id="cleaning-data" class="section level2">
 <h2>Cleaning data</h2>
+<p>To prepare the data-set for fitting into ML algorithms, we will perform the following steps: - As files contain a lot of missing values, for data cleaning we will convert all blank, ‘#DIV/0!’, and ‘NA’ values to NA’s. - For prediction quality we’ll only leave columns which have less than 60% of NA values. - We’ll remove: problem id, user name and timestamp values as they aren’t relevant to predictions</p>
+<pre class="r"><code>na_strings &lt;- c(&quot;&quot;, &quot;NA&quot;, &quot;#DIV/0!&quot;)
+
+training_set &lt;- read.csv(&quot;./data/pml-training.csv&quot;, na.strings = na_strings)
+testing_set &lt;- read.csv(&quot;./data/pml-test.csv&quot;, na.strings = na_strings)
+
+columns_to_remove &lt;- c(1:5)
+training_set &lt;- training_set[, -columns_to_remove]
+testing_set &lt;- testing_set[, -columns_to_remove]
+testing_set &lt;- testing_set[, -ncol(testing_set)] # remove problem id
+
+columns_to_remove_na &lt;- which((colSums(is.na(training_set)) &gt;= 0.4 * nrow(training_set)))
+training_set &lt;- training_set[,-columns_to_remove_na]
+testing_set     &lt;- testing_set[,-columns_to_remove_na]
+
+# convert all columns excluding class / problem id to numeric
+for (i in 1:(length(training_set) - 1)) {
+    training_set[, i] &lt;- as.numeric(training_set[, i])
+    testing_set[, i] &lt;- as.numeric(testing_set[, i])
+}</code></pre>
 </div>
 <div id="partition-data-into-training-and-test-sets" class="section level2">
 <h2>Partition data into training and test sets</h2>
+<p>For applying machine learning algorithms and testing the models we are going to split our training set to 60% for training, 40% of population for testing.</p>
+<pre class="r"><code>in_training  &lt;- createDataPartition(training_set$classe, p = 0.6, list = FALSE)
+training    &lt;- training_set[in_training, ]
+testing     &lt;- training_set[-in_training, ]</code></pre>
+</div>
+<div id="applying-random-forest-algorithm" class="section level2">
+<h2>Applying Random Forest algorithm</h2>
+<p>The outcome variable will be <code>classe</code> with all remaining columns to be used in the data frame for prediction. We will perform 5 fold cross validation.</p>
+<pre class="r"><code>class &lt;- training$classe
+data &lt;- training[, -ncol(training)]
+model &lt;- train(
+    data, class, method = &quot;rf&quot;,
+    tuneGrid = data.frame(.mtry = 3),
+    trControl = trainControl(method = &quot;cv&quot;, number = 5)
+)
+
+model</code></pre>
+<pre><code>## Random Forest 
+## 
+## 11776 samples
+##    54 predictor
+##     5 classes: 'A', 'B', 'C', 'D', 'E' 
+## 
+## No pre-processing
+## Resampling: Cross-Validated (5 fold) 
+## 
+## Summary of sample sizes: 9420, 9421, 9420, 9422, 9421 
+## 
+## Resampling results
+## 
+##   Accuracy   Kappa      Accuracy SD  Kappa SD   
+##   0.9933765  0.9916211  0.002048304  0.002591849
+## 
+## Tuning parameter 'mtry' was held constant at a value of 3
+## </code></pre>
+<pre class="r"><code>predictions &lt;- predict(model, testing, type = &quot;raw&quot;)
+confusionMatrix(predictions, testing$classe)</code></pre>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##           Reference
+## Prediction    A    B    C    D    E
+##          A 2232    4    0    0    0
+##          B    0 1513    7    0    0
+##          C    0    1 1361   17    0
+##          D    0    0    0 1267    6
+##          E    0    0    0    2 1436
+## 
+## Overall Statistics
+##                                           
+##                Accuracy : 0.9953          
+##                  95% CI : (0.9935, 0.9967)
+##     No Information Rate : 0.2845          
+##     P-Value [Acc &gt; NIR] : &lt; 2.2e-16       
+##                                           
+##                   Kappa : 0.994           
+##  Mcnemar's Test P-Value : NA              
+## 
+## Statistics by Class:
+## 
+##                      Class: A Class: B Class: C Class: D Class: E
+## Sensitivity            1.0000   0.9967   0.9949   0.9852   0.9958
+## Specificity            0.9993   0.9989   0.9972   0.9991   0.9997
+## Pos Pred Value         0.9982   0.9954   0.9869   0.9953   0.9986
+## Neg Pred Value         1.0000   0.9992   0.9989   0.9971   0.9991
+## Prevalence             0.2845   0.1935   0.1744   0.1639   0.1838
+## Detection Rate         0.2845   0.1928   0.1735   0.1615   0.1830
+## Detection Prevalence   0.2850   0.1937   0.1758   0.1622   0.1833
+## Balanced Accuracy      0.9996   0.9978   0.9961   0.9922   0.9978</code></pre>
+<p>Overall random forest performs really well with accuracy of 99.5%</p>
+</div>
+<div id="submit-results-of-test-set" class="section level2">
+<h2>Submit results of test set</h2>
+<pre class="r"><code>write_answer_files = function(x){
+  number_of_problems &lt;- length(x)
+  for (current_problem in 1:number_of_problems){
+    filename = paste0(&quot;problem_id_&quot;,current_problem,&quot;.txt&quot;)
+    write.table(x[current_problem],file = filename, quote = FALSE, row.names = FALSE, col.names = FALSE)
+  }
+}
+
+solutions &lt;- predict(model, testing_set)
+write_answer_files(solutions)</code></pre>
+</div>
+<div id="summary" class="section level2">
+<h2>Summary</h2>
+<p>During this project, we’ve fitted a prediction model using random forest algorithm to predict users activity based on sensors data. The model has a prediction accuracy of 99.5% and estimated out of sample error of 0.5% <span class="math">\((1 - testing accuracy)\)</span>. Although we do estimate the low out of sample error rate, we can expect prediction to be inaccurate much more frequently in the real life. Due to us making a prediction on subject movements being recored when performing to a set of specific predetermined activities.</p>
 </div>
 
 
